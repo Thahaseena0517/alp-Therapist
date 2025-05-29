@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import config from '../config';
 import '../styles/TherapistSelection.css';
 
 function TherapistSelection() {
+  const navigate = useNavigate();
   const [therapists, setTherapists] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -44,7 +46,26 @@ function TherapistSelection() {
       setAssigning(true);
       const token = localStorage.getItem('token');
       
-      // Make API call to assign user to therapist
+      // First, unassign from current therapist if exists
+      const currentTherapist = JSON.parse(localStorage.getItem('selectedTherapist'));
+      if (currentTherapist && currentTherapist._id !== therapist._id) {
+        try {
+          await axios.post(
+            `${config.apiBaseUrl}/therapists/${currentTherapist._id}/unassign`,
+            {},
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+        } catch (err) {
+          console.error('Error unassigning from current therapist:', err);
+        }
+      }
+      
+      // Then assign to new therapist
       const response = await axios.post(
         `${config.apiBaseUrl}/therapists/${therapist._id}/assign`,
         {},
@@ -60,8 +81,8 @@ function TherapistSelection() {
         // Store therapist info in localStorage
         localStorage.setItem('selectedTherapist', JSON.stringify(therapist));
         setSelectedTherapist(therapist);
-        // Show success message
-        alert('Successfully assigned to therapist!');
+        // Navigate to therapist dashboard
+        navigate('/therapist-dashboard');
       }
     } catch (err) {
       console.error('Error selecting therapist:', err);
@@ -81,7 +102,15 @@ function TherapistSelection() {
 
   return (
     <div className="therapist-selection-container">
-      <h2>Select Your Therapist</h2>
+      <div className="therapist-selection-header">
+        <button 
+          className="back-button"
+          onClick={() => navigate('/dashboard')}
+        >
+          <i className="fas fa-arrow-left"></i> Back to Dashboard
+        </button>
+        <h2>Select Your Therapist</h2>
+      </div>
       <div className="therapists-grid">
         {therapists.map((therapist) => (
           <div 

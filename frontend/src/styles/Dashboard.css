@@ -5,6 +5,9 @@
   width: 100vw;
   background-color: #f6f0f0ce;
 }
+.body html{
+  width:auto;
+}
 
 /* Sidebar Styles */
 .sidebar {

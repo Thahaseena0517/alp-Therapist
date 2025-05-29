@@ -856,45 +856,59 @@ app.post('/api/therapists/:therapistId/assign', auth, async (req, res) => {
       return res.status(403).json({ message: 'Only users can assign themselves to therapists' });
     }
 
-    const { therapistId } = req.params;
-    const userId = req.user._id;
+    const therapistId = req.params.therapistId;
+    const userId = req.user.id;
 
-    // Verify therapist exists and is actually a therapist
+    // Check if therapist exists
     const therapist = await User.findOne({ _id: therapistId, role: 'therapist' });
     if (!therapist) {
       return res.status(404).json({ message: 'Therapist not found' });
     }
 
-    // Check if assignment already exists
-    const existingAssignment = await TherapistAssignment.findOne({
+    // Remove user from any existing therapist's assignedUsers array
+    await User.updateMany(
+      { role: 'therapist', assignedUsers: userId },
+      { $pull: { assignedUsers: userId } }
+    );
+
+    // Add user to new therapist's assignedUsers array
+    await User.findByIdAndUpdate(
       therapistId,
-      userId,
-      status: 'active'
-    });
+      { $addToSet: { assignedUsers: userId } }
+    );
 
-    if (existingAssignment) {
-      return res.status(400).json({ message: 'Already assigned to this therapist' });
-    }
-
-    // Create new assignment
-    const assignment = new TherapistAssignment({
-      therapistId,
-      userId
-    });
-
-    await assignment.save();
-
-    res.status(201).json({ 
-      message: 'Successfully assigned to therapist',
-      assignment
-    });
+    res.json({ message: 'Successfully assigned to therapist' });
   } catch (error) {
-    console.error('Error assigning therapist:', error);
-    if (error.code === 11000) {
-      res.status(400).json({ message: 'Already assigned to this therapist' });
-    } else {
-      res.status(500).json({ message: 'Error assigning therapist' });
+    console.error('Error assigning user to therapist:', error);
+    res.status(500).json({ message: 'Error assigning user to therapist' });
+  }
+});
+
+/**
+ * Unassign User from Therapist Endpoint
+ * POST /api/therapists/:therapistId/unassign
+ * Removes the current user from a therapist's assigned users
+ */
+app.post('/api/therapists/:therapistId/unassign', auth, async (req, res) => {
+  try {
+    // Only allow users to access this endpoint
+    if (req.user.role !== 'user') {
+      return res.status(403).json({ message: 'Only users can access this endpoint' });
     }
+
+    const therapistId = req.params.therapistId;
+    const userId = req.user.id;
+
+    // Remove user from therapist's assignedUsers array
+    await User.findByIdAndUpdate(
+      therapistId,
+      { $pull: { assignedUsers: userId } }
+    );
+
+    res.json({ message: 'Successfully unassigned from therapist' });
+  } catch (error) {
+    console.error('Error unassigning user from therapist:', error);
+    res.status(500).json({ message: 'Error unassigning user from therapist' });
   }
 });
 
@@ -1158,7 +1172,13 @@ app.get('/api/therapists/user/:userId/progress', auth, async (req, res) => {
       }
 
       const progress = subjectProgress[subjectName];
-      progress.completedSubtopics.add(quiz.subtopicId.toString());
+      
+      // Check if any quiz result for this subtopic has reached level 8
+      const hasCompletedLevel8 = quiz.results.some(result => result.presentLevel >= 8);
+      if (hasCompletedLevel8) {
+        progress.completedSubtopics.add(quiz.subtopicId.toString());
+      }
+      
       progress.totalAttempts += quiz.results.length;
       progress.averageLevel = quiz.results.reduce((sum, result) => sum + result.presentLevel, 0) / quiz.results.length;
     });

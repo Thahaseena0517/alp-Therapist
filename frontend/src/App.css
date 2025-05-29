@@ -1,6 +1,7 @@
 body {
+  width:auto;
   text-align: center;
-  min-height: 100vh;
+  min-height: auto;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -14,6 +15,7 @@ body {
 
   background-size: cover;
   background-repeat: no-repeat;
+  overflow-x: hidden;
 }
 
 /* Remove all .auth-*, .login-*, .signup-* styles. Keep only global styles. */
